@@ -1,0 +1,33 @@
+{
+  "name": "js2ics",
+  "version": "0.1.0",
+  "description": "Creates iCal agendas from JSON events",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/quilicicf/js2ics.git"
+  },
+  "keywords": [
+    "ical",
+    "ics",
+    "calendar",
+    "icalendar"
+  ],
+  "author": "quilicicf <quilicicf@gmail.com> (https://github.com/quilicicf)",
+  "license": "ASL 2.0",
+  "bugs": {
+    "url": "https://github.com/quilicicf/js2ics/issues"
+  },
+  "homepage": "https://github.com/quilicicf/js2ics",
+  "dependencies": {
+    "moment": "^2.11.1"
+  },
+  "devDependencies": {
+    "mocha": "^3.1.2",
+    "chai": "^3.5.0"
+  },
+  "ES6": true
+}
