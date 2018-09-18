@@ -64,10 +64,11 @@ const validateFilePath = (fileName, filePath) => {
     return filePath;
   }
 
-  const validFileName = _.endsWith(fileName || DEFAULT_FILE_NAME, '.ics')
-    ? fileName
-    : `${fileName}.ics`;
+  if (!fileName) {
+    return path.join(TMPDIR, DEFAULT_FILE_NAME);
+  }
 
+  const validFileName = _.endsWith(fileName, '.ics') ? fileName : `${fileName}.ics`;
   return path.join(TMPDIR, validFileName);
 };
 
