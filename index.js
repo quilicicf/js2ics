@@ -1,210 +1,153 @@
-module.exports = (() => {
-  'use strict';
+// Imports
+const _ = require('lodash');
+const os = require('os');
+const fs = require('fs');
+const path = require('path');
+const moment = require('moment');
+const momenttz = require('moment-timezone');
 
-  // Imports
-  let fs = require('fs');
-  let os = require('os');
-  let path = require('path');
+// System stuff
+const TMPDIR = os.tmpdir();
+const SYSTEM_LINE_BREAK = os.EOL;
+const timezone = momenttz.tz.guess();
 
-  let _ = require('lodash');
-  let moment = require('moment');
-  let momenttz = require('moment-timezone');
+// Configuration
+const DEFAULT_EVENT_NAME = 'New Event';
+const DEFAULT_FILE_NAME = 'calendar-event.ics';
+const DEFAULT_ATTENDEE_RSVP = false;
 
-  // System stuff
-  const TMPDIR = os.tmpdir();
-  let SYSTEM_LINE_BREAK = os.EOL;
-  let timezone = momenttz.tz.guess();
+// Ical format stuff
+const inputTimeFormat = 'YYYY-MM-DDTHH:mm:ssZ'; // Basically, ISO_8601
+const icalTimeFormat = 'YYYYMMDDTHHmmss';
+const timeProperty = (name, dtstamp) => `${name};TZID=${timezone}:${dtstamp}`;
 
-  // Configuration
-  let DEFAULT_EVENT_NAME = 'New Event';
-  let DEFAULT_FILE_NAME = 'calendar-event.ics';
-  let DEFAULT_ATTENDEE_RSVP = false;
+const ICAL_FORMATTERS = {
+  calendarHeader: () => _.join([ 'BEGIN:VCALENDAR', 'VERSION:2.0' ], SYSTEM_LINE_BREAK),
+  calendarFooter: () => 'END:VCALENDAR',
 
-  // Ical format stuff
-  let inputTimeFormat = 'YYYY-MM-DDTHH:mm:ssZ'; // Basically, ISO_8601
-  let icalTimeFormat = 'YYYYMMDDTHHmmss';
-  let timeProperty = (name, dtstamp) => {
-    return name + ';TZID=' + timezone + ':' + dtstamp;
-  };
+  eventHeader: dtstamp => _.join([ '', 'BEGIN:VEVENT', timeProperty('DTSTAMP', dtstamp) ], SYSTEM_LINE_BREAK),
+  eventFooter: () => 'END:VEVENT',
 
-  let ICAL_FORMATTERS = {
-    calendarHeader: () => {
-      return _.join([ 'BEGIN:VCALENDAR', 'VERSION:2.0' ], SYSTEM_LINE_BREAK);
-    },
-    calendarFooter: () => { return 'END:VCALENDAR'; },
+  organizer: organizer => `ORGANIZER;CN=${organizer.name}:MAILTO:${organizer.email}`,
+  attendee: attendee => `ATTENDEE;CN="${attendee.name}";RSVP=${attendee.rsvp}:MAILTO:${attendee.email}`,
+  dtstart: dtstamp => timeProperty('DTSTART', dtstamp),
+  dtend: dtstamp => timeProperty('DTEND', dtstamp),
+  location: location => `LOCATION:${location}`,
+  description: description => `DESCRIPTION:${description}`,
+  summary: summary => `SUMMARY:${summary}`,
+};
 
-    eventHeader: (dtstamp) => {
-      return _.join([ '', 'BEGIN:VEVENT', timeProperty('DTSTAMP', dtstamp) ], SYSTEM_LINE_BREAK);
-    },
-    eventFooter: () => { return 'END:VEVENT'; },
+// Declarations
+const validateDateStamp = (dtstamp, hoursToAddIfEmpty) => (dtstamp
+  ? moment(dtstamp, inputTimeFormat).format(icalTimeFormat)
+  : moment().add(hoursToAddIfEmpty, 'h').format(icalTimeFormat));
 
-    organizer: (organizer) => {
-      return 'ORGANIZER;CN=' + organizer.name + ':MAILTO:' + organizer.email;
-    },
-    attendee: (attendee) => {
-      return 'ATTENDEE;CN="' + attendee.name + '";RSVP=' + attendee.rsvp + ':MAILTO:' + attendee.email;
-    },
-    dtstart: (dtstamp) => { return timeProperty('DTSTART', dtstamp); },
-    dtend: (dtstamp) => { return timeProperty('DTEND', dtstamp); },
-    location: (location) => { return 'LOCATION:' + location; },
-    description: (description) => { return 'DESCRIPTION:' + description; },
-    summary: (summary) => { return 'SUMMARY:' + summary; }
-  };
+const validateDateStart = dtstart => validateDateStamp(dtstart, 0);
 
-  // Declarations
-  let validateDateStamp, validateDateStart, validateDateEnd,
-  isValidPerson, validateOrganizer, validateAttendees,
-  validateFilePath, validateCalendarOptions, validateEventOptions,
-  formatCalendar, formatEvent, toFile, getCalendar, createCalendar;
+const validateDateEnd = dtend => validateDateStamp(dtend, 1);
 
-  // Validation
-  validateDateStamp = (dtstamp, hoursToAddIfEmpty) => {
-    return dtstamp
-    ? moment(dtstamp, inputTimeFormat).format(icalTimeFormat)
-    : moment().add(hoursToAddIfEmpty, 'h').format(icalTimeFormat);
-  };
+const isValidPerson = person => person && person.email && person.name;
 
-  validateDateStart = (dtstart) => {
-    return validateDateStamp(dtstart, 0);
-  };
+const validateOrganizer = organizer => (isValidPerson(organizer) ? organizer : false);
 
-  validateDateEnd = (dtend) => {
-    return validateDateStamp(dtend, 1);
-  };
+const validateAttendees = attendees => _(attendees)
+  .filter(isValidPerson)
+  .map(attendee => ({
+    email: attendee.email,
+    name: attendee.name,
+    rsvp: attendee.rsvp || DEFAULT_ATTENDEE_RSVP,
+  }))
+  .value();
 
-  isValidPerson = (person) => {
-    return person && person.email && person.name;
-  };
+const validateFilePath = (fileName, filePath) => {
+  if (filePath) {
+    return filePath;
+  }
 
-  validateOrganizer = (organizer) => {
-    return isValidPerson(organizer)
-    ? organizer
-    : false;
-  };
-
-  validateAttendees = (attendees) => {
-    return _(attendees)
-    .filter(isValidPerson)
-    .map((attendee) => {
-      let validatedAttendee = {
-        email: attendee.email,
-        name: attendee.name,
-        rsvp: attendee.rsvp ? attendee.rsvp : DEFAULT_ATTENDEE_RSVP
-      };
-
-      return validatedAttendee;
-    })
-    .value();
-  };
-
-  validateFilePath = (fileName, filePath) => {
-    if (filePath) {
-      return filePath;
-    }
-
-    let validFileName = fileName ? fileName : DEFAULT_FILE_NAME;
-    validFileName = _.endsWith(fileName, '.ics')
+  const validFileName = _.endsWith(fileName || DEFAULT_FILE_NAME, '.ics')
     ? fileName
-    : fileName + '.ics';
+    : `${fileName}.ics`;
 
-    return path.join(TMPDIR, validFileName);
+  return path.join(TMPDIR, validFileName);
+};
+
+const validateEventOptions = eventOptions => ({
+  dtstamp: validateDateStamp(eventOptions.dtstamp),
+  organizer: validateOrganizer(eventOptions.organizer),
+  dtstart: validateDateStart(eventOptions.dtstart),
+  dtend: validateDateEnd(eventOptions.dtend),
+  summary: eventOptions.eventName || DEFAULT_EVENT_NAME,
+  description: eventOptions.description || '',
+  location: eventOptions.location || false,
+  attendees: validateAttendees(eventOptions.attendees),
+});
+
+const validateCalendarOptions = (calendarOptions, filePath) => {
+  if (calendarOptions.isValid) {
+    return calendarOptions;
+  }
+
+  return {
+    filePath: validateFilePath(calendarOptions.filename, filePath),
+    events: calendarOptions.events
+      ? _.map(calendarOptions.events, eventOptions => validateEventOptions(eventOptions))
+      : [ validateEventOptions({}) ],
   };
+};
 
-  validateCalendarOptions = (calendarOptions, filePath) => {
-    if (calendarOptions.isValid) {
-      return calendarOptions;
-    }
+const formatCalendar = formattedEvents => (
+  _([ ICAL_FORMATTERS.calendarHeader(), formattedEvents, ICAL_FORMATTERS.calendarFooter() ])
+    .join(SYSTEM_LINE_BREAK)
+);
 
-    let validatedCalendarOptions = {};
-    validatedCalendarOptions.filePath = validateFilePath(calendarOptions.filename, filePath);
+const formatEvent = (validatedOptions) => {
+  const parts = [ ICAL_FORMATTERS.eventHeader(validatedOptions.dtstamp) ];
 
-    let events = calendarOptions.events;
-    if (events) {
-      validatedCalendarOptions.events = _.map(calendarOptions.events, (eventOptions) => {
-        return validateEventOptions(eventOptions);
-      });
+  const { attendees, organizer } = validatedOptions;
+  if (organizer) {
+    parts.push(ICAL_FORMATTERS.organizer(organizer));
+  }
 
-    } else {
-      validatedCalendarOptions.events = [ validateEventOptions({}) ];
+  if (attendees) {
+    _.each(attendees, attendee => parts.push(ICAL_FORMATTERS.attendee(attendee)));
+  }
 
-    }
-    return validatedCalendarOptions;
-  };
+  parts.push(ICAL_FORMATTERS.dtstart(validatedOptions.dtstart));
+  parts.push(ICAL_FORMATTERS.dtend(validatedOptions.dtend));
 
-  validateEventOptions = (eventOptions) => {
-    let validatedEventOptions = {};
-    validatedEventOptions.dtstamp = validateDateStamp(eventOptions.dtstamp);
-    validatedEventOptions.organizer = validateOrganizer(eventOptions.organizer);
-    validatedEventOptions.dtstart = validateDateStart(eventOptions.dtstart);
-    validatedEventOptions.dtend = validateDateEnd(eventOptions.dtend);
-    validatedEventOptions.summary = eventOptions.eventName || DEFAULT_EVENT_NAME;
-    validatedEventOptions.description = eventOptions.description || '';
-    validatedEventOptions.location = eventOptions.location || false;
-    validatedEventOptions.attendees = validateAttendees(eventOptions.attendees);
-    return validatedEventOptions;
-  };
+  if (validatedOptions.location) {
+    parts.push(ICAL_FORMATTERS.location(validatedOptions.location));
+  }
 
-  // Real formatter stuff
-  formatCalendar = (formattedEvents) => {
-    let parts = [ ICAL_FORMATTERS.calendarHeader(), formattedEvents, ICAL_FORMATTERS.calendarFooter() ];
-    return _.join(parts, SYSTEM_LINE_BREAK);
-  };
+  parts.push(ICAL_FORMATTERS.description(validatedOptions.description));
 
-  formatEvent = (validatedOptions) => {
-    let parts = [ ICAL_FORMATTERS.eventHeader(validatedOptions.dtstamp) ];
+  parts.push(ICAL_FORMATTERS.summary(validatedOptions.summary));
+  parts.push(ICAL_FORMATTERS.eventFooter());
 
-    let organizer = validatedOptions.organizer;
-    if (organizer) {
-      parts.push(ICAL_FORMATTERS.organizer(organizer));
-    }
+  return _.join(parts, SYSTEM_LINE_BREAK);
+};
 
-    let attendees = validatedOptions.attendees;
-    if (attendees) {
-      _.each(attendees, (attendee) => {
-        parts.push(ICAL_FORMATTERS.attendee(attendee));
-      });
-    }
+const toFile = (data, filePath, callback) =>
+  fs.writeFile(filePath, data, (err, destination) => {
+    if (err) { return callback(err); }
+    return callback(null, destination);
+  });
 
-    parts.push(ICAL_FORMATTERS.dtstart(validatedOptions.dtstart));
-    parts.push(ICAL_FORMATTERS.dtend(validatedOptions.dtend));
-
-    if (validatedOptions.location) {
-      parts.push(ICAL_FORMATTERS.location(validatedOptions.location));
-    }
-
-    parts.push(ICAL_FORMATTERS.description(validatedOptions.description));
-
-    parts.push(ICAL_FORMATTERS.summary(validatedOptions.summary));
-    parts.push(ICAL_FORMATTERS.eventFooter());
-
-    return _.join(parts, SYSTEM_LINE_BREAK);
-  };
-
-  toFile = (data, filePath, callback) => {
-    fs.writeFile(filePath, data, (err, destination) => {
-      if (err) { return callback(err); }
-      return callback(null, destination);
-    });
-  };
-
-  getCalendar = (calendarOptions) => {
-    _.omit(calendarOptions, 'isValid');
-    let validatedCalendarOptions = validateCalendarOptions(calendarOptions);
-    let formattedEvents = _(validatedCalendarOptions.events)
+const getCalendar = (calendarOptions) => {
+  _.omit(calendarOptions, 'isValid');
+  const validatedCalendarOptions = validateCalendarOptions(calendarOptions);
+  const formattedEvents = _(validatedCalendarOptions.events)
     .map(formatEvent)
     .join(SYSTEM_LINE_BREAK);
 
-    return formatCalendar(formattedEvents);
-  };
+  return formatCalendar(formattedEvents);
+};
 
-  createCalendar = (calendarOptions, filePath, callback) => {
-    _.omit(calendarOptions, 'isValid');
-    let validatedCalendarOptions = validateCalendarOptions(calendarOptions, filePath);
-    toFile(getCalendar(validatedCalendarOptions), validatedCalendarOptions.filePath, callback);
-  };
+const createCalendar = (calendarOptions, filePath, callback) => {
+  _.omit(calendarOptions, 'isValid');
+  const validatedCalendarOptions = validateCalendarOptions(calendarOptions, filePath);
+  toFile(getCalendar(validatedCalendarOptions), validatedCalendarOptions.filePath, callback);
+};
 
-  return {
-    getCalendar: getCalendar,
-    createCalendar: createCalendar
-  };
-})();
+
+module.exports = { getCalendar, createCalendar };
