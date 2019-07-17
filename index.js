@@ -4,12 +4,12 @@ const os = require('os');
 const fs = require('fs');
 const path = require('path');
 const moment = require('moment');
-const momenttz = require('moment-timezone');
+const { tz } = require('moment-timezone');
 
 // System stuff
 const TMPDIR = os.tmpdir();
 const SYSTEM_LINE_BREAK = os.EOL;
-const timezone = momenttz.tz.guess();
+const guessedTimezone = tz.guess();
 
 // Configuration
 const DEFAULT_EVENT_NAME = 'New Event';
@@ -19,19 +19,19 @@ const DEFAULT_ATTENDEE_RSVP = false;
 // Ical format stuff
 const inputTimeFormat = 'YYYY-MM-DDTHH:mm:ssZ'; // Basically, ISO_8601
 const icalTimeFormat = 'YYYYMMDDTHHmmss';
-const timeProperty = (name, dtstamp) => `${name};TZID=${timezone}:${dtstamp}`;
+const timeProperty = (name, dtstamp, timezone) => `${name};TZID=${timezone}:${dtstamp}`;
 
 const ICAL_FORMATTERS = {
   calendarHeader: () => _.join([ 'BEGIN:VCALENDAR', 'VERSION:2.0' ], SYSTEM_LINE_BREAK),
   calendarFooter: () => 'END:VCALENDAR',
 
-  eventHeader: dtstamp => _.join([ '', 'BEGIN:VEVENT', timeProperty('DTSTAMP', dtstamp) ], SYSTEM_LINE_BREAK),
+  eventHeader: (dtstamp, timeZone) => _.join([ '', 'BEGIN:VEVENT', timeProperty('DTSTAMP', dtstamp, timeZone) ], SYSTEM_LINE_BREAK),
   eventFooter: () => 'END:VEVENT',
 
   organizer: organizer => `ORGANIZER;CN=${organizer.name}:MAILTO:${organizer.email}`,
   attendee: attendee => `ATTENDEE;CN="${attendee.name}";RSVP=${attendee.rsvp}:MAILTO:${attendee.email}`,
-  dtstart: dtstamp => timeProperty('DTSTART', dtstamp),
-  dtend: dtstamp => timeProperty('DTEND', dtstamp),
+  dtstart: (dtstamp, timeZone) => timeProperty('DTSTART', dtstamp, timeZone),
+  dtend: (dtstamp, timeZone) => timeProperty('DTEND', dtstamp, timeZone),
   location: location => `LOCATION:${location}`,
   description: description => `DESCRIPTION:${description}`,
   summary: summary => `SUMMARY:${summary}`,
@@ -93,6 +93,7 @@ const validateCalendarOptions = (calendarOptions, filePath) => {
     events: calendarOptions.events
       ? _.map(calendarOptions.events, eventOptions => validateEventOptions(eventOptions))
       : [ validateEventOptions({}) ],
+    timeZone: calendarOptions.timeZone || guessedTimezone,
   };
 };
 
@@ -101,10 +102,9 @@ const formatCalendar = formattedEvents => (
     .join(SYSTEM_LINE_BREAK)
 );
 
-const formatEvent = (validatedOptions) => {
-  const parts = [ ICAL_FORMATTERS.eventHeader(validatedOptions.dtstamp) ];
+const formatEvent = ({ dtstamp, dtstart, dtend, attendees, organizer, location, description, summary }, { timeZone }) => {
+  const parts = [ ICAL_FORMATTERS.eventHeader(dtstamp, timeZone) ];
 
-  const { attendees, organizer } = validatedOptions;
   if (organizer) {
     parts.push(ICAL_FORMATTERS.organizer(organizer));
   }
@@ -113,16 +113,16 @@ const formatEvent = (validatedOptions) => {
     _.each(attendees, attendee => parts.push(ICAL_FORMATTERS.attendee(attendee)));
   }
 
-  parts.push(ICAL_FORMATTERS.dtstart(validatedOptions.dtstart));
-  parts.push(ICAL_FORMATTERS.dtend(validatedOptions.dtend));
+  parts.push(ICAL_FORMATTERS.dtstart(dtstart, timeZone));
+  parts.push(ICAL_FORMATTERS.dtend(dtend, timeZone));
 
-  if (validatedOptions.location) {
-    parts.push(ICAL_FORMATTERS.location(validatedOptions.location));
+  if (location) {
+    parts.push(ICAL_FORMATTERS.location(location));
   }
 
-  parts.push(ICAL_FORMATTERS.description(validatedOptions.description));
+  parts.push(ICAL_FORMATTERS.description(description));
 
-  parts.push(ICAL_FORMATTERS.summary(validatedOptions.summary));
+  parts.push(ICAL_FORMATTERS.summary(summary));
   parts.push(ICAL_FORMATTERS.eventFooter());
 
   return _.join(parts, SYSTEM_LINE_BREAK);
@@ -138,7 +138,7 @@ const getCalendar = (calendarOptions) => {
   _.omit(calendarOptions, 'isValid');
   const validatedCalendarOptions = validateCalendarOptions(calendarOptions);
   const formattedEvents = _(validatedCalendarOptions.events)
-    .map(formatEvent)
+    .map(event => formatEvent(event, validatedCalendarOptions))
     .join(SYSTEM_LINE_BREAK);
 
   return formatCalendar(formattedEvents);
