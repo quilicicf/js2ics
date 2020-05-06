@@ -102,7 +102,10 @@ const formatCalendar = formattedEvents => (
     .join(SYSTEM_LINE_BREAK)
 );
 
-const formatEvent = ({ dtstamp, dtstart, dtend, attendees, organizer, location, description, summary }, { timeZone }) => {
+const formatEvent = (event, { timeZone }) => {
+  const {
+    dtstamp, dtstart, dtend, attendees, organizer, location, description, summary,
+  } = event;
   const parts = [ ICAL_FORMATTERS.eventHeader(dtstamp, timeZone) ];
 
   if (organizer) {
