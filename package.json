@@ -24,7 +24,7 @@
   },
   "homepage": "https://github.com/quilicicf/js2ics",
   "dependencies": {
-    "lodash": "4.17.13",
+    "lodash": "4.17.15",
     "moment": "2.24.0",
     "moment-timezone": "0.5.23"
   },
