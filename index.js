@@ -28,13 +28,13 @@ const ICAL_FORMATTERS = {
   eventHeader: (dtstamp, timeZone) => _.join([ '', 'BEGIN:VEVENT', timeProperty('DTSTAMP', dtstamp, timeZone) ], SYSTEM_LINE_BREAK),
   eventFooter: () => 'END:VEVENT',
 
-  organizer: organizer => `ORGANIZER;CN=${organizer.name}:MAILTO:${organizer.email}`,
-  attendee: attendee => `ATTENDEE;CN="${attendee.name}";RSVP=${attendee.rsvp}:MAILTO:${attendee.email}`,
+  organizer: (organizer) => `ORGANIZER;CN=${organizer.name}:MAILTO:${organizer.email}`,
+  attendee: (attendee) => `ATTENDEE;CN="${attendee.name}";RSVP=${attendee.rsvp}:MAILTO:${attendee.email}`,
   dtstart: (dtstamp, timeZone) => timeProperty('DTSTART', dtstamp, timeZone),
   dtend: (dtstamp, timeZone) => timeProperty('DTEND', dtstamp, timeZone),
-  location: location => `LOCATION:${location}`,
-  description: description => `DESCRIPTION:${description}`,
-  summary: summary => `SUMMARY:${summary}`,
+  location: (location) => `LOCATION:${location}`,
+  description: (description) => `DESCRIPTION:${description}`,
+  summary: (summary) => `SUMMARY:${summary}`,
 };
 
 // Declarations
@@ -42,17 +42,17 @@ const validateDateStamp = (dtstamp, hoursToAddIfEmpty) => (dtstamp
   ? moment(dtstamp, inputTimeFormat).format(icalTimeFormat)
   : moment().add(hoursToAddIfEmpty, 'h').format(icalTimeFormat));
 
-const validateDateStart = dtstart => validateDateStamp(dtstart, 0);
+const validateDateStart = (dtstart) => validateDateStamp(dtstart, 0);
 
-const validateDateEnd = dtend => validateDateStamp(dtend, 1);
+const validateDateEnd = (dtend) => validateDateStamp(dtend, 1);
 
-const isValidPerson = person => person && person.email && person.name;
+const isValidPerson = (person) => person && person.email && person.name;
 
-const validateOrganizer = organizer => (isValidPerson(organizer) ? organizer : false);
+const validateOrganizer = (organizer) => (isValidPerson(organizer) ? organizer : false);
 
-const validateAttendees = attendees => _(attendees)
+const validateAttendees = (attendees) => _(attendees)
   .filter(isValidPerson)
-  .map(attendee => ({
+  .map((attendee) => ({
     email: attendee.email,
     name: attendee.name,
     rsvp: attendee.rsvp || DEFAULT_ATTENDEE_RSVP,
@@ -72,7 +72,7 @@ const validateFilePath = (fileName, filePath) => {
   return path.join(TMPDIR, validFileName);
 };
 
-const validateEventOptions = eventOptions => ({
+const validateEventOptions = (eventOptions) => ({
   dtstamp: validateDateStamp(eventOptions.dtstamp),
   organizer: validateOrganizer(eventOptions.organizer),
   dtstart: validateDateStart(eventOptions.dtstart),
@@ -91,13 +91,13 @@ const validateCalendarOptions = (calendarOptions, filePath) => {
   return {
     filePath: validateFilePath(calendarOptions.filename, filePath),
     events: calendarOptions.events
-      ? _.map(calendarOptions.events, eventOptions => validateEventOptions(eventOptions))
+      ? _.map(calendarOptions.events, (eventOptions) => validateEventOptions(eventOptions))
       : [ validateEventOptions({}) ],
     timeZone: calendarOptions.timeZone || guessedTimezone,
   };
 };
 
-const formatCalendar = formattedEvents => (
+const formatCalendar = (formattedEvents) => (
   _([ ICAL_FORMATTERS.calendarHeader(), formattedEvents, ICAL_FORMATTERS.calendarFooter() ])
     .join(SYSTEM_LINE_BREAK)
 );
@@ -113,7 +113,7 @@ const formatEvent = (event, { timeZone }) => {
   }
 
   if (attendees) {
-    _.each(attendees, attendee => parts.push(ICAL_FORMATTERS.attendee(attendee)));
+    _.each(attendees, (attendee) => parts.push(ICAL_FORMATTERS.attendee(attendee)));
   }
 
   parts.push(ICAL_FORMATTERS.dtstart(dtstart, timeZone));
@@ -131,17 +131,16 @@ const formatEvent = (event, { timeZone }) => {
   return _.join(parts, SYSTEM_LINE_BREAK);
 };
 
-const toFile = (data, filePath, callback) =>
-  fs.writeFile(filePath, data, (err, destination) => {
-    if (err) { return callback(err); }
-    return callback(null, destination);
-  });
+const toFile = (data, filePath, callback) => fs.writeFile(filePath, data, (err, destination) => {
+  if (err) { return callback(err); }
+  return callback(null, destination);
+});
 
 const getCalendar = (calendarOptions) => {
   _.omit(calendarOptions, 'isValid');
   const validatedCalendarOptions = validateCalendarOptions(calendarOptions);
   const formattedEvents = _(validatedCalendarOptions.events)
-    .map(event => formatEvent(event, validatedCalendarOptions))
+    .map((event) => formatEvent(event, validatedCalendarOptions))
     .join(SYSTEM_LINE_BREAK);
 
   return formatCalendar(formattedEvents);
@@ -152,6 +151,5 @@ const createCalendar = (calendarOptions, filePath, callback) => {
   const validatedCalendarOptions = validateCalendarOptions(calendarOptions, filePath);
   toFile(getCalendar(validatedCalendarOptions), validatedCalendarOptions.filePath, callback);
 };
-
 
 module.exports = { getCalendar, createCalendar };
