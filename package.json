@@ -28,15 +28,15 @@
     "lodash": "4.17.21",
     "moment": "2.29.1",
     "moment-timezone": "0.5.33",
-    "snyk": "^1.522.0"
+    "snyk": "^1.609.0"
   },
   "devDependencies": {
     "@talend/eslint-config": "3.0.0",
-    "eslint": "7.23.0",
+    "eslint": "7.27.0",
     "eslint-config-airbnb": "18.2.1",
-    "eslint-plugin-import": "2.22.1",
+    "eslint-plugin-import": "2.23.3",
     "eslint-plugin-jsx-a11y": "6.4.1",
-    "eslint-plugin-react": "7.23.1"
+    "eslint-plugin-react": "7.23.2"
   },
   "snyk": true
 }
