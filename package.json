@@ -28,11 +28,11 @@
     "lodash": "4.17.21",
     "moment": "2.29.1",
     "moment-timezone": "0.5.33",
-    "snyk": "^1.621.0"
+    "snyk": "^1.631.0"
   },
   "devDependencies": {
     "@talend/eslint-config": "3.0.0",
-    "eslint": "7.27.0",
+    "eslint": "7.28.0",
     "eslint-config-airbnb": "18.2.1",
     "eslint-plugin-import": "2.23.4",
     "eslint-plugin-jsx-a11y": "6.4.1",
