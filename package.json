@@ -1,6 +1,6 @@
 {
   "name": "js2ics",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Creates iCal agendas from JSON events",
   "main": "index.js",
   "scripts": {
