@@ -28,7 +28,7 @@
     "lodash": "4.17.21",
     "moment": "2.29.1",
     "moment-timezone": "0.5.33",
-    "snyk": "^1.750.0"
+    "snyk": "^1.752.0"
   },
   "devDependencies": {
     "@talend/eslint-config": "3.0.0",
