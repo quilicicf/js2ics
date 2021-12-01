@@ -27,7 +27,7 @@
   "dependencies": {
     "lodash": "4.17.21",
     "moment": "2.29.1",
-    "moment-timezone": "0.5.33",
+    "moment-timezone": "0.5.34",
     "snyk": "^1.758.0"
   },
   "devDependencies": {
